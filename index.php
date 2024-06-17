@@ -92,8 +92,6 @@ if (!isset($_SESSION['username'])) {
         <ul class="nav">
             <li><a href="admin.php">Administrar Instrumentos</a></li>
             <li><a href="out_of_use.php">Instrumentos Fuera de Uso</a></li>
-            <li><a href="history.php">Historial de Actualizaciones</a></li>
-            <li><a href="consulta.php">Consulta</a></li>
             <li><a href="logout.php">Cerrar Sesión</a></li>
         </ul>
         <div class="image-container">

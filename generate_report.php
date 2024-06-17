@@ -1,80 +1,84 @@
 <?php
-require 'config.php';
-
-function generateMonthlyReport($month, $year) {
-    $conn = getConnection('admin');
-
-    $firstDayOfMonth = "$year-$month-01";
-    $lastDayOfMonth = date("Y-m-t", strtotime($firstDayOfMonth));
-
-    $sql = "SELECT * FROM Instruments WHERE DueDate BETWEEN ? AND ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ss", $firstDayOfMonth, $lastDayOfMonth);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $filename = 'reporte_calibraciones_' . $year . '_' . $month . '.csv';
-    $file = fopen($filename, 'w');
-
-    $headers = array('ID', 'Description', 'Brand', 'Model', 'Serial Number', 'HWID', 'Cal Date', 'Due Date', 'Days counter.', 'Comments');
-    fputcsv($file, $headers);
-
-    while ($row = $result->fetch_assoc()) {
-        fputcsv($file, $row);
-    }
-
-    fclose($file);
-    $stmt->close();
-    $conn->close();
-
-    return $filename;
-}
-
-if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['month']) && isset($_GET['year'])) {
-    $month = $_GET['month'];
-    $year = $_GET['year'];
-    $filename = generateMonthlyReport($month, $year);
-    header('Content-Type: application/csv');
-    header('Content-Disposition: attachment; filename="' . $filename . '";');
-    readfile($filename);
-    unlink($filename); // Delete the file after download
+session_start();
+if (!isset($_SESSION['username']) || $_SESSION['role'] != 'admin') {
+    header('Location: login.php');
     exit();
 }
-?>
 
+require 'config.php';
+$conn = getConnection('admin');
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
+    $id = $_POST['id'];
+
+    // Llamar al procedimiento almacenado
+    $sql = "CALL ReturnInstrumentToActive(?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $id);
+
+    if ($stmt->execute()) {
+        header('Location: out_of_use.php');
+        exit();
+    } else {
+        echo "Error al regresar el instrumento a uso: " . $stmt->error;
+    }
+} else {
+    die("ID no proporcionado.");
+}
+?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Generar Reporte</title>
-    <link rel="stylesheet" type="text/css" href="styles.css">
+    <title>Regresar Instrumento a Uso</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .navbar, .card, .modal-content {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+
+        .form-control {
+            background-color: #2c2c2c;
+            color: #e0e0e0;
+            border: 1px solid #444444;
+        }
+
+        .form-control::placeholder {
+            color: #e0e0e0;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        
+        .container {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
     <?php include 'menu.php'; ?>
     <div class="container">
-        <h1>Generar Reporte Mensual de Calibraciones</h1>
-        <form action="generate_report.php" method="get">
-            <label for="month">Mes:</label>
-            <select name="month" id="month" required>
-                <?php
-                for ($m = 1; $m <= 12; $m++) {
-                    $monthName = date('F', mktime(0, 0, 0, $m, 1));
-                    echo "<option value='$m'>$monthName</option>";
-                }
-                ?>
-            </select>
-
-            <label for="year">Año:</label>
-            <select name="year" id="year" required>
-                <?php
-                $currentYear = date('Y');
-                for ($y = $currentYear; $y >= $currentYear - 10; $y--) {
-                    echo "<option value='$y'>$y</option>";
-                }
-                ?>
-            </select>
-
-            <input type="submit" value="Generar Reporte">
+        <h1 class="my-4">Regresar Instrumento a Uso</h1>
+        <form method="POST" action="move_back_to_instruments.php">
+            <input type="hidden" name="id" value="<?php echo htmlspecialchars($_GET['id']); ?>">
+            <button type="submit" class="btn btn-primary">Regresar a Uso</button>
         </form>
     </div>
 </body>
 </html>
+<?php
+$conn->close();
+?>
